@@ -443,17 +443,7 @@ export class Signal implements INodeType {
 		try {
 			let response;
 			debug('Signal Node: Executing with resource=%s, operation=%s', resource, operation);
-			if (resource === 'message' && operation === 'send') {
-				const account = this.getNodeParameter('account', 0) as string;
-				const recipient = this.getNodeParameter('recipient', 0) as string;
-				const message = this.getNodeParameter('message', 0) as string;
-
-				const requestBody = {
-					jsonrpc: '2.0',
-					method: 'send',
-					params: { account, recipient, message },
-					id: uuidv4(),
-				};
+			if (resource === 'message' && operation === 'send') { const account = this.getNodeParameter('account', 0) as string; let raw = (this.getNodeParameter('recipient', 0) as string || '').trim(); const message = this.getNodeParameter('message', 0) as string; // Normalize: strip quotes from expressions, decode URI artifacts, strip 'group.' prefix raw = raw.replace(/^['"]|['"]$/g, ''); // leading/trailing quotes try { raw = decodeURIComponent(raw); } catch {} // ignore if not URI-encoded if (/^group\./i.test(raw)) raw = raw.replace(/^group\./i, ''); const params: Record<string, unknown> = { account, message }; // Regex to match base64/base64url group IDs (length typically 43–44 including padding, but allow 20+) const base64Like = /^[A-Za-z0-9+/_-]{20,}={0,2}$/; if (base64Like.test(raw)) { // If it looks like a group id, treat it as such // Convert URL-safe to standard base64 for servers that expect '+' and '/' const normalizedGroupId = raw.replace(/-/g, '+').replace(/_/g, '/'); params.groupId = normalizedGroupId; } else { // Validate E.164 phone number format if (!/^\+[1-9]\d{1,14}$/.test(raw)) { throw new Error( Invalid recipient. Provide E.164 phone number (e.g., +1234567890) + or a Signal group id (base64/base64url). Got: ${raw} ); } params.recipient = raw; } const requestBody = { jsonrpc: '2.0', method: 'send', params, id: uuidv4(), }; try { response = await axios.post(${url}, requestBody); } catch (err: any) { // Preserve server error details to debug quickly const status = err?.response?.status; const data = err?.response?.data; const msg = data?.error?.message || data?.message || err?.message || 'Unknown error'; throw new Error( Signal API error${status ? ${status} : ''}: ${msg} + ${data ? | payload: ${JSON.stringify(data)} : ''} ); } }
 				debug('Signal Node: Sending message with requestBody=%o', requestBody);
 				response = await axios.post(`${url}`, requestBody);
 			} else if (resource === 'group' && operation === 'create') {
